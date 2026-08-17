@@ -18,7 +18,8 @@ export async function fetchUpcomingContests(platforms = [], hoursAhead = 72) {
         start__gte: now.toISOString(),
         start__lte: future.toISOString(),
         order_by: 'start',
-        host__in: platforms.join(','),
+        // FIX: Changed from 'host__in' to 'resource__host__in' to properly filter multiple domains
+        resource__host__in: platforms.join(','),
         limit: 100
       },
       timeout: 10000
