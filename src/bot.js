@@ -105,43 +105,79 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   const { commandName, guildId, channelId } = interaction;
 
+  // Fetch or create the server's database configuration
   let config = await GuildConfig.findOne({ guildId });
   if (!config) {
     config = await GuildConfig.create({ guildId, notificationChannelId: channelId });
   }
 
   try {
+    // COMMAND 1: /set_channel
     if (commandName === 'set_channel') {
       config.notificationChannelId = channelId;
       await config.save();
-      await interaction.reply({ content: `✅ Notifications set to <#${channelId}>.`, ephemeral: true });
+      return await interaction.reply({ content: `✅ Notifications set to <#${channelId}>.`, ephemeral: true });
     }
+
+    // COMMAND 2: /subscribe
     if (commandName === 'subscribe') {
       const platform = interaction.options.getString('platform');
+      if (!platform) {
+        return await interaction.reply({ content: `❌ Please specify a platform to subscribe to.`, ephemeral: true });
+      }
+
       if (config.subscribedPlatforms.includes(platform)) {
         config.subscribedPlatforms = config.subscribedPlatforms.filter(p => p !== platform);
         await config.save();
-        await interaction.reply({ content: `❌ Removed **${platform}**.`, ephemeral: true });
+        return await interaction.reply({ content: `❌ Removed **${platform}** from notifications.`, ephemeral: true });
       } else {
         config.subscribedPlatforms.push(platform);
         await config.save();
-        await interaction.reply({ content: `✅ Added **${platform}**.`, ephemeral: true });
+        return await interaction.reply({ content: `✅ Added **${platform}** to notifications.`, ephemeral: true });
       }
     }
+
+    // COMMAND 3: /subscriptions 
+    if (commandName === 'subscriptions') {
+      if (!config.subscribedPlatforms || config.subscribedPlatforms.length === 0) {
+        return await interaction.reply({ content: `ℹ️ This server is not subscribed to any platforms yet. Use \`/subscribe\` to add some!`, ephemeral: true });
+      }
+      const list = config.subscribedPlatforms.map(p => `• ${p}`).join('\n');
+      return await interaction.reply({ content: `**Current Subscriptions:**\n${list}`, ephemeral: true });
+    }
+
+    // COMMAND 4: /upcoming
     if (commandName === 'upcoming') {
       await interaction.deferReply();
       const p = interaction.options.getString('platform');
       const targets = p ? [p] : config.subscribedPlatforms;
+      
+      if (!targets || targets.length === 0) {
+        return await interaction.editReply('⚠️ No platforms selected. Please specify a platform or use `/subscribe` first.');
+      }
+
       const contests = await fetchUpcomingContests(targets, 72);
-      if (contests.length === 0) return interaction.editReply('No contests found.');
+      if (!contests || contests.length === 0) {
+        return await interaction.editReply('ℹ️ No upcoming contests found for the selected platforms in the next 72 hours.');
+      }
+      
       const embeds = contests.slice(0, 4).map(c => createContestEmbed(c, false));
-      await interaction.editReply({ embeds });
+      return await interaction.editReply({ embeds });
     }
+
+    // Catch-all for any ghost commands
+    return await interaction.reply({ content: `❌ Command not recognized.`, ephemeral: true });
+
   } catch (error) {
-    console.error('Error handling interaction:', error);
-    const msg = 'Error executing command.';
-    if (interaction.deferred) await interaction.followUp({ content: msg, ephemeral: true });
-    else await interaction.reply({ content: msg, ephemeral: true });
+    console.error(`🚨 Error executing /${commandName}:`, error);
+    const msg = '❌ An error occurred while executing this command. Please try again.';
+    
+    // Safely reply to the user even if the command crashed halfway through
+    if (interaction.deferred) {
+      return await interaction.followUp({ content: msg, ephemeral: true });
+    } else if (!interaction.replied) {
+      return await interaction.reply({ content: msg, ephemeral: true });
+    }
   }
 });
 
