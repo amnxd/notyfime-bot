@@ -137,7 +137,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
     }
 
-    // COMMAND 3: /subscriptions 
+    // COMMAND 3: /subscriptions
     if (commandName === 'subscriptions') {
       if (!config.subscribedPlatforms || config.subscribedPlatforms.length === 0) {
         return await interaction.reply({ content: `ℹ️ This server is not subscribed to any platforms yet. Use \`/subscribe\` to add some!`, ephemeral: true });
@@ -146,7 +146,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return await interaction.reply({ content: `**Current Subscriptions:**\n${list}`, ephemeral: true });
     }
 
-    // COMMAND 4: /upcoming
+    // COMMAND 4: /upcoming (Extended to 14 days / 336 hours)
     if (commandName === 'upcoming') {
       await interaction.deferReply();
       const p = interaction.options.getString('platform');
@@ -156,23 +156,23 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return await interaction.editReply('⚠️ No platforms selected. Please specify a platform or use `/subscribe` first.');
       }
 
-      const contests = await fetchUpcomingContests(targets, 72);
+      const contests = await fetchUpcomingContests(targets, 336);
       if (!contests || contests.length === 0) {
-        return await interaction.editReply('ℹ️ No upcoming contests found for the selected platforms in the next 72 hours.');
+        return await interaction.editReply('ℹ️ No upcoming contests found for the selected platforms in the next 14 days.');
       }
       
       const embeds = contests.slice(0, 4).map(c => createContestEmbed(c, false));
       return await interaction.editReply({ embeds });
     }
 
-    // Catch-all for any ghost commands
+    // Catch-all for any unrecognized commands
     return await interaction.reply({ content: `❌ Command not recognized.`, ephemeral: true });
 
   } catch (error) {
     console.error(`🚨 Error executing /${commandName}:`, error);
     const msg = '❌ An error occurred while executing this command. Please try again.';
     
-    // Safely reply to the user even if the command crashed halfway through
+    // Safely reply to the user even if the command encountered an issue midway
     if (interaction.deferred) {
       return await interaction.followUp({ content: msg, ephemeral: true });
     } else if (!interaction.replied) {
