@@ -8,14 +8,27 @@ import { GuildConfig } from './database/GuildConfig.js';
 import { fetchUpcomingContests } from './services/clistService.js';
 import { createContestEmbed } from './utils/embedBuilder.js';
 
+// --- 0. ENVIRONMENT SANITY CHECK ---
+console.log('--- Environment Check ---');
+console.log(`DISCORD_BOT_TOKEN: ${process.env.DISCORD_BOT_TOKEN ? 'Loaded (Length: ' + process.env.DISCORD_BOT_TOKEN.trim().length + ')' : '❌ MISSING'}`);
+console.log(`MONGO_URI: ${process.env.MONGO_URI ? 'Loaded' : '❌ MISSING'}`);
+console.log(`CLIST_USERNAME: ${process.env.CLIST_USERNAME ? 'Loaded' : '❌ MISSING'}`);
+console.log(`CLIST_API_KEY: ${process.env.CLIST_API_KEY ? 'Loaded' : '❌ MISSING'}`);
+console.log('-------------------------');
+
 // --- 1. UPTIMEROBOT PING SERVER ---
 const app = express();
 app.get('/', (req, res) => res.send('Notyfime is awake!'));
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🌐 Express ping server running on port ${PORT}`));
 
-// --- 2. DISCORD BOT SETUP ---
+// --- 2. DISCORD BOT SETUP & DEBUGGING ---
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+// Discord Gateway Diagnostic Listeners
+client.on('error', (err) => console.error('🚨 Discord Client Error:', err));
+client.on('warn', (warn) => console.warn('⚠️ Discord Client Warning:', warn));
+client.on('debug', (info) => console.log('🔍 [Debug]:', info));
 
 // Time constants in milliseconds
 const ONE_HOUR = 60 * 60 * 1000;
@@ -87,7 +100,7 @@ client.once(Events.ClientReady, async (c) => {
   });
 });
 
-// --- COMMAND HANDLING (Kept identical to your working setup) ---
+// --- 3. COMMAND HANDLING ---
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   const { commandName, guildId, channelId } = interaction;
@@ -125,11 +138,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.editReply({ embeds });
     }
   } catch (error) {
-    console.error(error);
+    console.error('Error handling interaction:', error);
     const msg = 'Error executing command.';
     if (interaction.deferred) await interaction.followUp({ content: msg, ephemeral: true });
     else await interaction.reply({ content: msg, ephemeral: true });
   }
 });
 
-client.login(process.env.DISCORD_BOT_TOKEN);
+// --- 4. AUTHENTICATION & LOGIN ---
+const botToken = process.env.DISCORD_BOT_TOKEN ? process.env.DISCORD_BOT_TOKEN.trim() : null;
+
+if (!botToken) {
+  console.error('❌ FATAL: DISCORD_BOT_TOKEN is missing or undefined in your environment variables!');
+} else {
+  console.log('🔑 Attempting to authenticate with Discord Gateway...');
+  client.login(botToken).catch((error) => {
+    console.error('❌ FATAL LOGIN ERROR:', error);
+  });
+}
