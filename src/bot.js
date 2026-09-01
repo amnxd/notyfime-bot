@@ -31,8 +31,10 @@ client.on('warn', (warn) => console.warn('⚠️ Discord Client Warning:', warn)
 client.on('debug', (info) => console.log('🔍 [Debug]:', info));
 
 // Time constants in milliseconds
-const ONE_HOUR = 60 * 60 * 1000;
-const ONE_DAY = 24 * ONE_HOUR;
+const THIRTY_MINS = 30 * 60 * 1000;
+const THREE_HOURS = 3 * 60 * 60 * 1000;
+const ONE_DAY = 24 * 60 * 60 * 1000;
+const THREE_DAYS = 3 * ONE_DAY;
 
 async function runContestNotificationJob() {
   try {
@@ -59,18 +61,18 @@ async function runContestNotificationJob() {
         let reminderLabel = '';
 
         // Check milestones from shortest to longest
-        if (timeUntil <= ONE_HOUR && !config.notified1h.includes(contest.id)) {
-          targetArray = 'notified1h';
-          reminderLabel = '1 HOUR LEFT';
-        } else if (timeUntil > ONE_HOUR && timeUntil <= ONE_DAY && !config.notified24h.includes(contest.id)) {
-          targetArray = 'notified24h';
-          reminderLabel = '24 HOURS LEFT';
-        } else if (timeUntil > ONE_DAY && timeUntil <= 3 * ONE_DAY && !config.notified3d.includes(contest.id)) {
+        if (timeUntil <= THIRTY_MINS && !config.notified30m.includes(contest.id)) {
+          targetArray = 'notified30m';
+          reminderLabel = '30 MINS LEFT';
+        } else if (timeUntil > THIRTY_MINS && timeUntil <= THREE_HOURS && !config.notified3h.includes(contest.id)) {
+          targetArray = 'notified3h';
+          reminderLabel = '3 HOURS LEFT';
+        } else if (timeUntil > THREE_HOURS && timeUntil <= ONE_DAY && !config.notified1d.includes(contest.id)) {
+          targetArray = 'notified1d';
+          reminderLabel = '1 DAY LEFT';
+        } else if (timeUntil > ONE_DAY && timeUntil <= THREE_DAYS && !config.notified3d.includes(contest.id)) {
           targetArray = 'notified3d';
           reminderLabel = '3 DAYS LEFT';
-        } else if (timeUntil > 3 * ONE_DAY && timeUntil <= 7 * ONE_DAY && !config.notified1w.includes(contest.id)) {
-          targetArray = 'notified1w';
-          reminderLabel = '1 WEEK LEFT';
         }
 
         // If a milestone is triggered, send the message and save to DB
@@ -93,7 +95,7 @@ client.once(Events.ClientReady, async (c) => {
   console.log(`🚀 Notyfime is online! Authenticated as ${c.user.tag}`);
   await connectDB();
 
-  // Run the check every 15 minutes to catch the 1-hour window accurately
+  // Run the check every 15 minutes to accurately catch the 30-minute window
   cron.schedule('*/15 * * * *', async () => {
     console.log('🔄 Checking time-milestones for upcoming contests...');
     await runContestNotificationJob();
