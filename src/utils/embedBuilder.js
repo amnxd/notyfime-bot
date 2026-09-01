@@ -41,5 +41,5 @@ export function createContestEmbed(contest, isReminder = false, reminderText = '
       { name: 'Starts At', value: `${fullTimeString}\n(<t:${startUnix}:R>)`, inline: false }
     )
     // .setFooter({ text: 'wanna contribute? ' })
-    // .setTimestamp();
+    .setTimestamp();
 }
