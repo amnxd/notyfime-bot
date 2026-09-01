@@ -40,6 +40,6 @@ export function createContestEmbed(contest, isReminder = false, reminderText = '
       { name: 'Duration', value: `${durationHours} hrs`, inline: true },
       { name: 'Starts At', value: `${fullTimeString}\n(<t:${startUnix}:R>)`, inline: false }
     )
-    .setFooter({ text: 'wanna contribute? contact <@1288507196019052567>' })
+    .setFooter({ text: 'wanna contribute? contact @amnxd' })
     .setTimestamp();
 }
