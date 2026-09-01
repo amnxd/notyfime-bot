@@ -27,19 +27,18 @@ export function createContestEmbed(contest, isReminder = false, reminderText = '
     timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' 
   }) + ' EST';
 
-  // Combine them into the minimal format
-  const fullTimeString = `${istDateString} / ${utcTime} / ${estTime}`;
+  // Wrapping in triple backticks forces a monospace (fixed-width) block
+  // Using 'text' prevents Discord from accidentally applying weird color highlighting
+  const fullTimeString = `\`\`\`text\n${istDateString}\n${utcTime}\n${estTime}\n\`\`\``;
 
   return new EmbedBuilder()
     .setTitle(`${titlePrefix}${contest.event}`)
     .setURL(contest.href)
-    // Using a subtle dark gray (0x2B2D31) for default, pale yellow for reminders
     .setColor(isReminder ? 0xFEE75C : 0x2B2D31)
     .addFields(
       { name: 'Platform', value: `\`${contest.host}\``, inline: true },
-      { name: 'Duration', value: `${durationHours} hrs`, inline: true },
-      { name: 'Starts At', value: `${fullTimeString}\n(<t:${startUnix}:R>)`, inline: false }
-    )
-    .setFooter({ text: 'wanna contribute? contact @amnxd' })
-    .setTimestamp();
+      // Added backticks to Duration to match the fixed-width styling of Platform
+      { name: 'Duration', value: `\`${durationHours} hrs\``, inline: true },
+      { name: 'Starts At', value: `${fullTimeString}(<t:${startUnix}:R>)`, inline: false }
+    );
 }
