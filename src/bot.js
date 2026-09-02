@@ -128,7 +128,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
   if (!embed) return;
 
   // Verify the user clicked the specific tracking emoji
-  if (reaction.emoji.id !== CUSTOM_EMOJI_ID && reaction.emoji.name !== '✅') return;
+  if (reaction.emoji.id !== CUSTOM_EMOJI_ID && reaction.emoji.name !== ':heartmc:') return;
 
   const contestName = embed.title || 'Unknown Contest';
   const platform = embed.fields?.find(f => f.name === 'Platform')?.value.replace(/`/g, '') || 'Unknown';
