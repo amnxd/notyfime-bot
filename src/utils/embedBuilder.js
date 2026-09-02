@@ -29,7 +29,6 @@ export function createContestEmbed(contest, isReminder = false, reminderText = '
       { name: 'Duration', value: `${durationHours} hrs`, inline: true },
       { name: 'Starts At', value: `${fullTimeString}\n( <t:${startUnix}:R> )`, inline: false }
     )
-    // Removed the .setImage() transparent pixel hack to restore natural widths
-    .setFooter({ text: 'wanna contribute? contact @amnxd' })
+    // The invisible image is back, guaranteeing uniform flat width for all embeds
     .setTimestamp();
 }

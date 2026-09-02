@@ -9,12 +9,6 @@ import { UserReminder } from './database/UserReminder.js';
 import { fetchUpcomingContests } from './services/clistService.js';
 import { createContestEmbed } from './utils/embedBuilder.js';
 
-// --- SET YOUR CUSTOM EMOJI HERE ---
-// You can paste the raw numbers OR the full <a:heartmc:123456789> format
-const RAW_EMOJI_INPUT = 'YOUR_EMOJI_HERE'; 
-// This automatically strips out letters/brackets to prevent Discord API crashes
-const CUSTOM_EMOJI_ID = RAW_EMOJI_INPUT.replace(/[^0-9]/g, ''); 
-
 console.log('--- Environment Check ---');
 console.log(`DISCORD_BOT_TOKEN: ${process.env.DISCORD_BOT_TOKEN ? 'Loaded' : '❌ MISSING'}`);
 console.log(`MONGO_URI: ${process.env.MONGO_URI ? 'Loaded' : '❌ MISSING'}`);
@@ -54,7 +48,8 @@ async function runContestNotificationJob() {
           const embed = createContestEmbed(contest);
           
           const sentMessage = await channel.send({ embeds: [embed] });
-          await sentMessage.react(CUSTOM_EMOJI_ID).catch((err) => console.error('Emoji Error:', err.message)); 
+          // Hardcoded native checkmark to prevent API errors
+          await sentMessage.react('✅').catch(() => console.error('Failed to react')); 
           
           config.announcedContests.push(contest.id.toString());
           configChanged = true;
@@ -122,8 +117,8 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
   const embed = reaction.message.embeds[0];
   if (!embed) return;
 
-  // Uses the safely extracted numeric ID
-  if (reaction.emoji.id !== CUSTOM_EMOJI_ID) return;
+  // Strict enforcement: Only the native checkmark triggers the opt-in
+  if (reaction.emoji.name !== '✅') return;
 
   const contestName = embed.title || 'Unknown Contest';
   const platform = embed.fields?.find(f => f.name === 'Platform')?.value.replace(/`/g, '') || 'Unknown';
@@ -192,7 +187,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const embed = createContestEmbed(contest);
         const sentMessage = await interaction.followUp({ embeds: [embed], fetchReply: true });
         
-        await sentMessage.react(CUSTOM_EMOJI_ID).catch((err) => console.error('Emoji Error:', err.message));
+        await sentMessage.react('✅').catch(() => console.error('Failed to react'));
       }
       return;
     }
@@ -206,5 +201,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
+// Pulling configuration securely
 const botToken = process.env.DISCORD_BOT_TOKEN ? process.env.DISCORD_BOT_TOKEN.trim() : null;
 client.login(botToken).catch((error) => console.error('❌ FATAL LOGIN ERROR:', error));
