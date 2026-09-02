@@ -9,6 +9,9 @@ import { UserReminder } from './database/UserReminder.js';
 import { fetchUpcomingContests } from './services/clistService.js';
 import { createContestEmbed } from './utils/embedBuilder.js';
 
+// Hardcoded numeric ID for your :heartmc: custom emoji
+const CUSTOM_EMOJI_ID = '1544413375851929650'; 
+
 console.log('--- Environment Check ---');
 console.log(`DISCORD_BOT_TOKEN: ${process.env.DISCORD_BOT_TOKEN ? 'Loaded' : '❌ MISSING'}`);
 console.log(`MONGO_URI: ${process.env.MONGO_URI ? 'Loaded' : '❌ MISSING'}`);
@@ -48,8 +51,8 @@ async function runContestNotificationJob() {
           const embed = createContestEmbed(contest);
           
           const sentMessage = await channel.send({ embeds: [embed] });
-          // Hardcoded native checkmark to prevent API errors
-          await sentMessage.react('✅').catch(() => console.error('Failed to react')); 
+          // Applies the custom :heartmc: emoji directly to the automated message
+          await sentMessage.react(CUSTOM_EMOJI_ID).catch((err) => console.error('Emoji Error:', err.message)); 
           
           config.announcedContests.push(contest.id.toString());
           configChanged = true;
@@ -80,6 +83,7 @@ async function runContestNotificationJob() {
         try {
           const user = await client.users.fetch(rem.userId);
           if (user) {
+            // Ultra-minimal push notification layout
             const pushMessage = `**[ alert ]**\n\n**${rem.contestName}**\n\`${rem.platform}\`\n\n*${reminderLabel.toLowerCase()}*`;
             await user.send(pushMessage);
             
@@ -117,8 +121,8 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
   const embed = reaction.message.embeds[0];
   if (!embed) return;
 
-  // Strict enforcement: Only the native checkmark triggers the opt-in
-  if (reaction.emoji.name !== '✅') return;
+  // Strict enforcement: Only the custom :heartmc: emoji triggers the opt-in
+  if (reaction.emoji.id !== CUSTOM_EMOJI_ID) return;
 
   const contestName = embed.title || 'Unknown Contest';
   const platform = embed.fields?.find(f => f.name === 'Platform')?.value.replace(/`/g, '') || 'Unknown';
@@ -137,6 +141,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
       { upsert: true }
     );
 
+    // Ultra-minimal confirmation layout
     const dmMessage = `**[ tracker enabled ]**\n\n**${contestName}**\n\`${platform}\`\n\n*ping scheduled 15m prior to start.*`;
     await user.send(dmMessage);
     
@@ -187,7 +192,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const embed = createContestEmbed(contest);
         const sentMessage = await interaction.followUp({ embeds: [embed], fetchReply: true });
         
-        await sentMessage.react('✅').catch(() => console.error('Failed to react'));
+        // Applies the custom :heartmc: emoji directly to manual upcoming searches
+        await sentMessage.react(CUSTOM_EMOJI_ID).catch((err) => console.error('Emoji Error:', err.message));
       }
       return;
     }
@@ -201,6 +207,5 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// Pulling configuration securely
 const botToken = process.env.DISCORD_BOT_TOKEN ? process.env.DISCORD_BOT_TOKEN.trim() : null;
 client.login(botToken).catch((error) => console.error('❌ FATAL LOGIN ERROR:', error));
