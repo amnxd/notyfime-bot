@@ -10,9 +10,10 @@ import { fetchUpcomingContests } from './services/clistService.js';
 import { createContestEmbed } from './utils/embedBuilder.js';
 
 // --- SET YOUR CUSTOM EMOJI HERE ---
-// You MUST paste the numeric ID of your :heartmc: emoji here for it to work
-// Type \:heartmc: in your Discord chat to get the raw ID numbers
-const CUSTOM_EMOJI_ID = 'YOUR_EMOJI_ID_HERE'; 
+// You can paste the raw numbers OR the full <a:heartmc:123456789> format
+const RAW_EMOJI_INPUT = 'YOUR_EMOJI_HERE'; 
+// This automatically strips out letters/brackets to prevent Discord API crashes
+const CUSTOM_EMOJI_ID = RAW_EMOJI_INPUT.replace(/[^0-9]/g, ''); 
 
 console.log('--- Environment Check ---');
 console.log(`DISCORD_BOT_TOKEN: ${process.env.DISCORD_BOT_TOKEN ? 'Loaded' : '❌ MISSING'}`);
@@ -53,7 +54,6 @@ async function runContestNotificationJob() {
           const embed = createContestEmbed(contest);
           
           const sentMessage = await channel.send({ embeds: [embed] });
-          // Fallback removed. If it fails now, it will log the error so you can fix the ID
           await sentMessage.react(CUSTOM_EMOJI_ID).catch((err) => console.error('Emoji Error:', err.message)); 
           
           config.announcedContests.push(contest.id.toString());
@@ -122,7 +122,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
   const embed = reaction.message.embeds[0];
   if (!embed) return;
 
-  // Now strictly forces the custom emoji ID and ignores everything else
+  // Uses the safely extracted numeric ID
   if (reaction.emoji.id !== CUSTOM_EMOJI_ID) return;
 
   const contestName = embed.title || 'Unknown Contest';
@@ -192,7 +192,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const embed = createContestEmbed(contest);
         const sentMessage = await interaction.followUp({ embeds: [embed], fetchReply: true });
         
-        // Removed fallback here as well
         await sentMessage.react(CUSTOM_EMOJI_ID).catch((err) => console.error('Emoji Error:', err.message));
       }
       return;
