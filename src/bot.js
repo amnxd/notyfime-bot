@@ -10,7 +10,8 @@ import { fetchUpcomingContests } from './services/clistService.js';
 import { createContestEmbed } from './utils/embedBuilder.js';
 
 // --- SET YOUR CUSTOM EMOJI HERE ---
-// Paste the numeric ID of your :heartmc: emoji here
+// You MUST paste the numeric ID of your :heartmc: emoji here for it to work
+// Type \:heartmc: in your Discord chat to get the raw ID numbers
 const CUSTOM_EMOJI_ID = 'YOUR_EMOJI_ID_HERE'; 
 
 console.log('--- Environment Check ---');
@@ -24,7 +25,6 @@ const app = express();
 app.get('/', (req, res) => res.send('Notyfime is awake!'));
 app.listen(process.env.PORT || 3000, () => console.log(`🌐 Ping server running`));
 
-// Added Reaction Intents and Partials so the bot can see reactions on older messages
 const client = new Client({ 
   intents: [
     GatewayIntentBits.Guilds, 
@@ -52,9 +52,9 @@ async function runContestNotificationJob() {
         if (!config.announcedContests.includes(contest.id.toString())) {
           const embed = createContestEmbed(contest);
           
-          // Send message and instantly react with the custom emoji
           const sentMessage = await channel.send({ embeds: [embed] });
-          await sentMessage.react(CUSTOM_EMOJI_ID).catch(() => sentMessage.react('✅')); 
+          // Fallback removed. If it fails now, it will log the error so you can fix the ID
+          await sentMessage.react(CUSTOM_EMOJI_ID).catch((err) => console.error('Emoji Error:', err.message)); 
           
           config.announcedContests.push(contest.id.toString());
           configChanged = true;
@@ -85,7 +85,6 @@ async function runContestNotificationJob() {
         try {
           const user = await client.users.fetch(rem.userId);
           if (user) {
-            // Ultra-minimal push notification layout
             const pushMessage = `**[ alert ]**\n\n**${rem.contestName}**\n\`${rem.platform}\`\n\n*${reminderLabel.toLowerCase()}*`;
             await user.send(pushMessage);
             
@@ -108,27 +107,23 @@ client.once(Events.ClientReady, async (c) => {
   cron.schedule('*/5 * * * *', runContestNotificationJob);
 });
 
-// === REACTION LISTENER (DM CONFIRMATION) ===
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
-  if (user.bot) return; // Ignore the bot's own reactions
+  if (user.bot) return;
 
-  // Fetch older messages if they aren't currently cached
   if (reaction.partial) {
     try {
       await reaction.fetch();
     } catch (error) {
-      console.error('Something went wrong when fetching the message:', error);
       return;
     }
   }
 
-  // Ensure this is a reaction on our bot's embed
   if (reaction.message.author.id !== client.user.id) return;
   const embed = reaction.message.embeds[0];
   if (!embed) return;
 
-  // Verify the user clicked the specific tracking emoji
-  if (reaction.emoji.id !== CUSTOM_EMOJI_ID && reaction.emoji.name !== ':heartmc:') return;
+  // Now strictly forces the custom emoji ID and ignores everything else
+  if (reaction.emoji.id !== CUSTOM_EMOJI_ID) return;
 
   const contestName = embed.title || 'Unknown Contest';
   const platform = embed.fields?.find(f => f.name === 'Platform')?.value.replace(/`/g, '') || 'Unknown';
@@ -139,7 +134,6 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 
   try {
     await UserReminder.updateOne(
-      // We use the unique URL as the contest ID since we removed the buttons
       { userId: user.id, contestId: embed.url },
       { 
         $set: { contestName, platform, startTime },
@@ -148,12 +142,11 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
       { upsert: true }
     );
 
-    // Ultra-minimal confirmation layout
     const dmMessage = `**[ tracker enabled ]**\n\n**${contestName}**\n\`${platform}\`\n\n*ping scheduled 15m prior to start.*`;
     await user.send(dmMessage);
     
   } catch (error) {
-    console.error('Could not set reminder or DM user. Ensure DMs are open.');
+    console.error('Could not set reminder or DM user.');
   }
 });
 
@@ -197,9 +190,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.deleteReply(); 
       for (const contest of contests.slice(0, 4)) {
         const embed = createContestEmbed(contest);
-        // fetchReply allows us to grab the message object immediately so we can react to it
         const sentMessage = await interaction.followUp({ embeds: [embed], fetchReply: true });
-        await sentMessage.react(CUSTOM_EMOJI_ID).catch(() => sentMessage.react('✅'));
+        
+        // Removed fallback here as well
+        await sentMessage.react(CUSTOM_EMOJI_ID).catch((err) => console.error('Emoji Error:', err.message));
       }
       return;
     }
@@ -213,6 +207,5 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// Securely pull the token from your configuration setup
 const botToken = process.env.DISCORD_BOT_TOKEN ? process.env.DISCORD_BOT_TOKEN.trim() : null;
 client.login(botToken).catch((error) => console.error('❌ FATAL LOGIN ERROR:', error));
