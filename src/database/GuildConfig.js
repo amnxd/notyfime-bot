@@ -5,8 +5,10 @@ const GuildConfigSchema = new mongoose.Schema({
   notificationChannelId: { type: String, default: null },
   subscribedPlatforms: { type: [String], default: [] },
   
-  // Tracks contests already announced to the channel so it doesn't spam
-  announcedContests: { type: [String], default: [] }
+  // Channel recurring milestones
+  notified3d: { type: [String], default: [] },
+  notified1d: { type: [String], default: [] },
+  notified2h: { type: [String], default: [] }
 }, { timestamps: true });
 
 export const GuildConfig = mongoose.model('GuildConfig', GuildConfigSchema);

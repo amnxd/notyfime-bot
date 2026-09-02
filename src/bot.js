@@ -9,8 +9,13 @@ import { UserReminder } from './database/UserReminder.js';
 import { fetchUpcomingContests } from './services/clistService.js';
 import { createContestEmbed } from './utils/embedBuilder.js';
 
-// Hardcoded numeric ID for your :heartmc: custom emoji
 const CUSTOM_EMOJI_ID = '1544413375851929650'; 
+
+// Time milestones
+const FIFTEEN_MINS = 15 * 60 * 1000;
+const TWO_HOURS = 2 * 60 * 60 * 1000;
+const ONE_DAY = 24 * 60 * 60 * 1000;
+const THREE_DAYS = 3 * ONE_DAY;
 
 console.log('--- Environment Check ---');
 console.log(`DISCORD_BOT_TOKEN: ${process.env.DISCORD_BOT_TOKEN ? 'Loaded' : '❌ MISSING'}`);
@@ -36,6 +41,7 @@ client.on('error', (err) => console.error('🚨 Client Error:', err));
 
 async function runContestNotificationJob() {
   try {
+    // === PHASE 1: CHANNEL RECURRING ANNOUNCEMENTS (3d, 1d, 2h) ===
     const configs = await GuildConfig.find({ notificationChannelId: { $ne: null } });
     for (const config of configs) {
       if (!config.subscribedPlatforms || config.subscribedPlatforms.length === 0) continue;
@@ -47,47 +53,47 @@ async function runContestNotificationJob() {
       let configChanged = false;
 
       for (const contest of contests) {
-        if (!config.announcedContests.includes(contest.id.toString())) {
-          const embed = createContestEmbed(contest);
-          
+        const timeUntil = new Date(contest.start).getTime() - Date.now();
+        if (timeUntil <= 0) continue; 
+
+        let targetArray = null;
+        let reminderLabel = '';
+
+        if (timeUntil <= TWO_HOURS && !config.notified2h.includes(contest.id.toString())) {
+          targetArray = 'notified2h'; reminderLabel = '2 HOURS LEFT';
+        } else if (timeUntil > TWO_HOURS && timeUntil <= ONE_DAY && !config.notified1d.includes(contest.id.toString())) {
+          targetArray = 'notified1d'; reminderLabel = '1 DAY LEFT';
+        } else if (timeUntil > ONE_DAY && timeUntil <= THREE_DAYS && !config.notified3d.includes(contest.id.toString())) {
+          targetArray = 'notified3d'; reminderLabel = '3 DAYS LEFT';
+        }
+
+        if (targetArray) {
+          const embed = createContestEmbed(contest, true, reminderLabel);
           const sentMessage = await channel.send({ embeds: [embed] });
-          // Applies the custom :heartmc: emoji directly to the automated message
           await sentMessage.react(CUSTOM_EMOJI_ID).catch((err) => console.error('Emoji Error:', err.message)); 
           
-          config.announcedContests.push(contest.id.toString());
+          config[targetArray].push(contest.id.toString());
           configChanged = true;
         }
       }
       if (configChanged) await config.save();
     }
 
+    // === PHASE 2: DIRECT MESSAGE PINGS (15 mins only) ===
     const reminders = await UserReminder.find({ startTime: { $gt: new Date() } });
     for (const rem of reminders) {
       const timeUntil = rem.startTime.getTime() - Date.now();
       if (timeUntil <= 0) continue;
 
-      let targetField = null;
-      let reminderLabel = '';
-
-      if (timeUntil <= 15 * 60 * 1000 && !rem.notified15m) {
-        targetField = 'notified15m'; reminderLabel = '15 MINS LEFT';
-      } else if (timeUntil > 15 * 60 * 1000 && timeUntil <= 3 * 60 * 60 * 1000 && !rem.notified3h) {
-        targetField = 'notified3h'; reminderLabel = '3 HOURS LEFT';
-      } else if (timeUntil > 3 * 60 * 60 * 1000 && timeUntil <= 24 * 60 * 60 * 1000 && !rem.notified1d) {
-        targetField = 'notified1d'; reminderLabel = '1 DAY LEFT';
-      } else if (timeUntil > 24 * 60 * 60 * 1000 && timeUntil <= 3 * 24 * 60 * 60 * 1000 && !rem.notified3d) {
-        targetField = 'notified3d'; reminderLabel = '3 DAYS LEFT';
-      }
-
-      if (targetField) {
+      if (timeUntil <= FIFTEEN_MINS && !rem.notified15m) {
         try {
           const user = await client.users.fetch(rem.userId);
           if (user) {
-            // Ultra-minimal push notification layout
-            const pushMessage = `**[ alert ]**\n\n**${rem.contestName}**\n\`${rem.platform}\`\n\n*${reminderLabel.toLowerCase()}*`;
+            // Includes the physical @ping directly in the minimal DM
+            const pushMessage = `<@${rem.userId}> **[ alert ]**\n\n**${rem.contestName}**\n\`${rem.platform}\`\n\n*starting in 15 mins.*`;
             await user.send(pushMessage);
             
-            rem[targetField] = true;
+            rem.notified15m = true;
             await rem.save();
           }
         } catch (err) {
@@ -121,10 +127,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
   const embed = reaction.message.embeds[0];
   if (!embed) return;
 
-  // Strict enforcement: Only the custom :heartmc: emoji triggers the opt-in
   if (reaction.emoji.id !== CUSTOM_EMOJI_ID) return;
 
-  const contestName = embed.title || 'Unknown Contest';
+  const contestName = embed.title.replace(/Reminder \([A-Z0-9 ]+\): /g, '').trim() || 'Unknown Contest';
   const platform = embed.fields?.find(f => f.name === 'Platform')?.value.replace(/`/g, '') || 'Unknown';
   const startsAtField = embed.fields?.find(f => f.name === 'Starts At')?.value || '';
   
@@ -136,12 +141,11 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
       { userId: user.id, contestId: embed.url },
       { 
         $set: { contestName, platform, startTime },
-        $setOnInsert: { notified3d: false, notified1d: false, notified3h: false, notified15m: false }
+        $setOnInsert: { notified15m: false }
       },
       { upsert: true }
     );
 
-    // Ultra-minimal confirmation layout
     const dmMessage = `**[ tracker enabled ]**\n\n**${contestName}**\n\`${platform}\`\n\n*ping scheduled 15m prior to start.*`;
     await user.send(dmMessage);
     
@@ -191,8 +195,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       for (const contest of contests.slice(0, 4)) {
         const embed = createContestEmbed(contest);
         const sentMessage = await interaction.followUp({ embeds: [embed], fetchReply: true });
-        
-        // Applies the custom :heartmc: emoji directly to manual upcoming searches
         await sentMessage.react(CUSTOM_EMOJI_ID).catch((err) => console.error('Emoji Error:', err.message));
       }
       return;
